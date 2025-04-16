@@ -1,5 +1,6 @@
 package com.threadPool.sdk.config;
 
+import com.alibaba.fastjson2.JSON;
 import com.threadPool.sdk.domain.DynamicThreadPoolService;
 import com.threadPool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 import org.apache.commons.lang.StringUtils;
@@ -36,7 +37,7 @@ public class DynamicThreadPoolAutoConfig {
             applicationName = "缺省的";
             logger.warn("动态线程池，启动提示。SpringBoot 应用未配置 spring.application.name 无法获取到应用名称！");
         }
-
+        logger.info("线程池信息:{}", JSON.toJSONString(threadPoolExecutorMap.keySet()));
         // 获取缓存数据，设置本地线程池配置
         Set<String> threadPoolKeys = threadPoolExecutorMap.keySet();
         for (String threadPoolKey : threadPoolKeys) {
