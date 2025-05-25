@@ -1,11 +1,17 @@
 package com.threadPool.sdk.config;
 
+import com.alibaba.cloud.nacos.NacosConfigManager;
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.nacos.api.NacosFactory;
+import com.alibaba.nacos.api.config.ConfigService;
+import com.alibaba.nacos.api.exception.NacosException;
 import com.threadPool.sdk.domain.DynamicThreadPoolService;
 import com.threadPool.sdk.domain.IDynamicThreadPoolService;
+import com.threadPool.sdk.domain.model.entity.NacosConfigEntity;
 import com.threadPool.sdk.domain.model.entity.ThreadPoolConfigEntity;
 import com.threadPool.sdk.domain.model.valobj.RegistryEnumVO;
 import com.threadPool.sdk.registry.IRegistry;
+import com.threadPool.sdk.registry.nacos.NacosRegistry;
 import com.threadPool.sdk.registry.redis.RedisRegistry;
 import com.threadPool.sdk.trigger.job.ThreadPoolDataReportJob;
 import com.threadPool.sdk.trigger.listener.ThreadPoolConfigAdjustListener;
@@ -25,6 +31,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -35,7 +42,7 @@ import java.util.concurrent.ThreadPoolExecutor;
  */
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(DynamicThreadPoolAutoProperties.class)
+@EnableConfigurationProperties({DynamicThreadPoolAutoProperties.class, NacosDynamicThreadPoolAutoProperties.class})
 public class DynamicThreadPoolAutoConfig {
     private final Logger logger = LoggerFactory.getLogger(DynamicThreadPoolAutoConfig.class);
 
@@ -66,12 +73,34 @@ public class DynamicThreadPoolAutoConfig {
 
         return redissonClient;
     }
+    @Bean("nacosConfigEntity")
+    public NacosConfigEntity nacosConfigEntity(NacosDynamicThreadPoolAutoProperties nacosDynamicThreadPoolAutoProperties){
+        NacosConfigEntity nacosConfigEntity = new NacosConfigEntity();
+        nacosConfigEntity.setNacosServerAddr(nacosDynamicThreadPoolAutoProperties.getNacosServerAddr());
+        nacosConfigEntity.setNacosNamespace(nacosDynamicThreadPoolAutoProperties.getNacosNamespace());
+        nacosConfigEntity.setNacosGroup(nacosDynamicThreadPoolAutoProperties.getNacosGroup());
+        nacosConfigEntity.setNacosDataId(nacosDynamicThreadPoolAutoProperties.getNacosDataId());
 
-    @Bean
+        logger.info("动态线程池，注册器（nacos）链接初始化完成。{} {} {} {}", nacosConfigEntity.getNacosServerAddr(), nacosConfigEntity.getNacosNamespace(),nacosConfigEntity.getNacosGroup(),nacosConfigEntity.getNacosDataId());
+        return nacosConfigEntity;
+    }
+    @Bean("configService")
+    public ConfigService configService(NacosConfigEntity nacosConfigEntity) throws NacosException {
+        Properties properties = new Properties();
+        properties.put("serverAddr", nacosConfigEntity.getNacosServerAddr());
+        properties.put("namespace", nacosConfigEntity.getNacosNamespace());
+        return NacosFactory.createConfigService(properties);
+    }
+
+    @Bean("redisRegistry")
     public IRegistry redisRegistry(RedissonClient dynamicThreadRedissonClient) {
         return new RedisRegistry(dynamicThreadRedissonClient);
     }
 
+    @Bean("nacosRegistry")
+    public IRegistry nacosRegistry(NacosConfigEntity nacosConfigEntity, ConfigService configService) {
+        return new NacosRegistry(nacosConfigEntity,configService);
+    }
 
     @Bean("dynamicThreadPollService")
     public DynamicThreadPoolService dynamicThreadPollService(ApplicationContext applicationContext, Map<String, ThreadPoolExecutor> threadPoolExecutorMap,RedissonClient redissonClient) {
@@ -97,13 +126,13 @@ public class DynamicThreadPoolAutoConfig {
     }
 
     @Bean
-    public ThreadPoolDataReportJob threadPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService, IRegistry registry) {
-        return new ThreadPoolDataReportJob(dynamicThreadPoolService, registry);
+    public ThreadPoolDataReportJob threadPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService, IRegistry redisRegistry) {
+        return new ThreadPoolDataReportJob(dynamicThreadPoolService, redisRegistry);
     }
 
     @Bean
-    public ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener(IDynamicThreadPoolService dynamicThreadPoolService, IRegistry registry) {
-        return new ThreadPoolConfigAdjustListener(dynamicThreadPoolService, registry);
+    public ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener(IDynamicThreadPoolService dynamicThreadPoolService, IRegistry redisRegistry) {
+        return new ThreadPoolConfigAdjustListener(dynamicThreadPoolService, redisRegistry);
     }
 
     @Bean(name = "dynamicThreadPoolRedisTopic")
@@ -112,6 +141,7 @@ public class DynamicThreadPoolAutoConfig {
         topic.addListener(ThreadPoolConfigEntity.class, threadPoolConfigAdjustListener);
         return topic;
     }
+    //TODO 要实现nacos的监听和定时任务的bean注入
 
 
 }

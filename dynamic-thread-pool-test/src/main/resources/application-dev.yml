@@ -24,6 +24,15 @@ dynamic:
         # redis port
         port: 6379
 
+spring:
+  cloud:
+    nacos:
+      config:
+        server-addr: 127.0.0.1:8848
+        namespace: a00510c4-c973-4179-961e-dd500a1c350d
+        group: DEFAULT_GROUP
+        data-id: dynamic-thread-pool.yml
+
 # 日志
 logging:
   level:
