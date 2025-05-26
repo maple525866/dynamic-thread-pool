@@ -13,7 +13,9 @@ import com.threadPool.sdk.domain.model.valobj.RegistryEnumVO;
 import com.threadPool.sdk.registry.IRegistry;
 import com.threadPool.sdk.registry.nacos.NacosRegistry;
 import com.threadPool.sdk.registry.redis.RedisRegistry;
+import com.threadPool.sdk.trigger.job.NacosPoolDataReportJob;
 import com.threadPool.sdk.trigger.job.ThreadPoolDataReportJob;
+import com.threadPool.sdk.trigger.listener.NacosPoolConfigAdjustListener;
 import com.threadPool.sdk.trigger.listener.ThreadPoolConfigAdjustListener;
 import org.apache.commons.lang.StringUtils;
 import org.redisson.Redisson;
@@ -24,6 +26,7 @@ import org.redisson.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -126,22 +129,53 @@ public class DynamicThreadPoolAutoConfig {
     }
 
     @Bean
-    public ThreadPoolDataReportJob threadPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService, IRegistry redisRegistry) {
+    public ThreadPoolDataReportJob threadPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService,@Qualifier("redisRegistry")IRegistry redisRegistry) {
         return new ThreadPoolDataReportJob(dynamicThreadPoolService, redisRegistry);
     }
 
     @Bean
-    public ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener(IDynamicThreadPoolService dynamicThreadPoolService, IRegistry redisRegistry) {
+    public NacosPoolDataReportJob nacosPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService,@Qualifier("nacosRegistry")IRegistry nacosRegistry) {
+        return new NacosPoolDataReportJob(dynamicThreadPoolService,nacosRegistry);
+    }
+
+    /**
+     * redis配置监听器
+     * @param dynamicThreadPoolService
+     * @param redisRegistry
+     * @return
+     */
+    @Bean
+    public ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener(IDynamicThreadPoolService dynamicThreadPoolService,@Qualifier("redisRegistry")IRegistry redisRegistry) {
         return new ThreadPoolConfigAdjustListener(dynamicThreadPoolService, redisRegistry);
     }
 
+    /**
+     * nacos配置监听器
+     * @param dynamicThreadPoolService
+     * @param nacosRegistry
+     * @param configService
+     * @param nacosConfigEntity
+     * @return
+     */
+    @Bean
+    public NacosPoolConfigAdjustListener nacosPoolConfigAdjustListener(IDynamicThreadPoolService dynamicThreadPoolService,
+                                                                       @Qualifier("nacosRegistry") IRegistry nacosRegistry,
+                                                                       ConfigService configService,
+                                                                       NacosConfigEntity nacosConfigEntity) {
+        return new NacosPoolConfigAdjustListener(dynamicThreadPoolService, nacosRegistry,configService,nacosConfigEntity);
+    }
+
+    /**
+     * 监听器订阅指定的topic
+     * @param redissonClient
+     * @param threadPoolConfigAdjustListener
+     * @return
+     */
     @Bean(name = "dynamicThreadPoolRedisTopic")
     public RTopic threadPoolConfigAdjustListener(RedissonClient redissonClient, ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener) {
         RTopic topic = redissonClient.getTopic(RegistryEnumVO.DYNAMIC_THREAD_POOL_REDIS_TOPIC.getKey() + "_" + applicationName);
         topic.addListener(ThreadPoolConfigEntity.class, threadPoolConfigAdjustListener);
         return topic;
     }
-    //TODO 要实现nacos的监听和定时任务的bean注入
-
 
 }

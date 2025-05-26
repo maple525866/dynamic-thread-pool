@@ -59,6 +59,14 @@ public class ThreadPoolConfigEntity {
         this.threadPoolName = threadPoolName;
     }
 
+    public void setAppName(String appName) {
+        this.appName = appName;
+    }
+
+    public void setThreadPoolName(String threadPoolName) {
+        this.threadPoolName = threadPoolName;
+    }
+
     public String getAppName() {
         return appName;
     }
