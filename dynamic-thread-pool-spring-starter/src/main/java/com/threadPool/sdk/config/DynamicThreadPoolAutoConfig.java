@@ -51,6 +51,11 @@ public class DynamicThreadPoolAutoConfig {
 
     private String applicationName;
 
+    /**
+     * 创建 Redisson 客户端实例
+     * @param properties 动态线程池自动配置属性
+     * @return RedissonClient 实例
+     */
     @Bean("dynamicThreadRedissonClient")
     public RedissonClient redissonClient(DynamicThreadPoolAutoProperties properties) {
         Config config = new Config();
@@ -76,6 +81,11 @@ public class DynamicThreadPoolAutoConfig {
 
         return redissonClient;
     }
+    /**
+     * 创建 Nacos 配置实体
+     * @param nacosDynamicThreadPoolAutoProperties Nacos动态线程池自动配置属性
+     * @return NacosConfigEntity 实例
+     */
     @Bean("nacosConfigEntity")
     public NacosConfigEntity nacosConfigEntity(NacosDynamicThreadPoolAutoProperties nacosDynamicThreadPoolAutoProperties){
         NacosConfigEntity nacosConfigEntity = new NacosConfigEntity();
@@ -87,6 +97,12 @@ public class DynamicThreadPoolAutoConfig {
         logger.info("动态线程池，注册器（nacos）链接初始化完成。{} {} {} {}", nacosConfigEntity.getNacosServerAddr(), nacosConfigEntity.getNacosNamespace(),nacosConfigEntity.getNacosGroup(),nacosConfigEntity.getNacosDataId());
         return nacosConfigEntity;
     }
+    /**
+     * 创建 Nacos 配置服务
+     * @param nacosConfigEntity Nacos配置实体
+     * @return ConfigService Nacos配置服务实例
+     * @throws NacosException Nacos相关异常
+     */
     @Bean("configService")
     public ConfigService configService(NacosConfigEntity nacosConfigEntity) throws NacosException {
         Properties properties = new Properties();
@@ -95,16 +111,34 @@ public class DynamicThreadPoolAutoConfig {
         return NacosFactory.createConfigService(properties);
     }
 
+    /**
+     * 创建 Redis 注册器
+     * @param dynamicThreadRedissonClient Redisson客户端实例
+     * @return Redis注册器实例
+     */
     @Bean("redisRegistry")
     public IRegistry redisRegistry(RedissonClient dynamicThreadRedissonClient) {
         return new RedisRegistry(dynamicThreadRedissonClient);
     }
 
+    /**
+     * 创建 Nacos 注册器
+     * @param nacosConfigEntity Nacos配置实体
+     * @param configService Nacos配置服务
+     * @return Nacos注册器实例
+     */
     @Bean("nacosRegistry")
     public IRegistry nacosRegistry(NacosConfigEntity nacosConfigEntity, ConfigService configService) {
         return new NacosRegistry(nacosConfigEntity,configService);
     }
 
+    /**
+     * 创建动态线程池服务
+     * @param applicationContext Spring应用上下文
+     * @param threadPoolExecutorMap 线程池执行器映射
+     * @param redissonClient Redisson客户端实例
+     * @return 动态线程池服务实例
+     */
     @Bean("dynamicThreadPollService")
     public DynamicThreadPoolService dynamicThreadPollService(ApplicationContext applicationContext, Map<String, ThreadPoolExecutor> threadPoolExecutorMap,RedissonClient redissonClient) {
         applicationName = applicationContext.getEnvironment().getProperty("spring.application.name");
@@ -128,21 +162,33 @@ public class DynamicThreadPoolAutoConfig {
         return new DynamicThreadPoolService(applicationName, threadPoolExecutorMap);
     }
 
+    /**
+     * 创建线程池数据上报任务（Redis）
+     * @param dynamicThreadPoolService 动态线程池服务
+     * @param redisRegistry Redis注册器
+     * @return 线程池数据上报任务实例
+     */
     @Bean
     public ThreadPoolDataReportJob threadPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService,@Qualifier("redisRegistry")IRegistry redisRegistry) {
         return new ThreadPoolDataReportJob(dynamicThreadPoolService, redisRegistry);
     }
 
+    /**
+     * 创建线程池数据上报任务（Nacos）
+     * @param dynamicThreadPoolService 动态线程池服务
+     * @param nacosRegistry Nacos注册器
+     * @return Nacos线程池数据上报任务实例
+     */
     @Bean
     public NacosPoolDataReportJob nacosPoolDataReportJob(IDynamicThreadPoolService dynamicThreadPoolService,@Qualifier("nacosRegistry")IRegistry nacosRegistry) {
         return new NacosPoolDataReportJob(dynamicThreadPoolService,nacosRegistry);
     }
 
     /**
-     * redis配置监听器
-     * @param dynamicThreadPoolService
-     * @param redisRegistry
-     * @return
+     * 创建线程池配置调整监听器（Redis）
+     * @param dynamicThreadPoolService 动态线程池服务
+     * @param redisRegistry Redis注册器
+     * @return 线程池配置调整监听器实例
      */
     @Bean
     public ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener(IDynamicThreadPoolService dynamicThreadPoolService,@Qualifier("redisRegistry")IRegistry redisRegistry) {
@@ -150,12 +196,12 @@ public class DynamicThreadPoolAutoConfig {
     }
 
     /**
-     * nacos配置监听器
-     * @param dynamicThreadPoolService
-     * @param nacosRegistry
-     * @param configService
-     * @param nacosConfigEntity
-     * @return
+     * 创建线程池配置调整监听器（Nacos）
+     * @param dynamicThreadPoolService 动态线程池服务
+     * @param nacosRegistry Nacos注册器
+     * @param configService Nacos配置服务
+     * @param nacosConfigEntity Nacos配置实体
+     * @return Nacos线程池配置调整监听器实例
      */
     @Bean
     public NacosPoolConfigAdjustListener nacosPoolConfigAdjustListener(IDynamicThreadPoolService dynamicThreadPoolService,
@@ -166,10 +212,10 @@ public class DynamicThreadPoolAutoConfig {
     }
 
     /**
-     * 监听器订阅指定的topic
-     * @param redissonClient
-     * @param threadPoolConfigAdjustListener
-     * @return
+     * 创建Redis Topic监听器
+     * @param redissonClient Redisson客户端实例
+     * @param threadPoolConfigAdjustListener 线程池配置调整监听器
+     * @return Redis Topic实例
      */
     @Bean(name = "dynamicThreadPoolRedisTopic")
     public RTopic threadPoolConfigAdjustListener(RedissonClient redissonClient, ThreadPoolConfigAdjustListener threadPoolConfigAdjustListener) {
